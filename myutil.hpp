@@ -2,11 +2,10 @@
 #define MYUTIL_HPP_
 
 #include <vector>
-#include <iostream>
 
 
 namespace myutil{
-	bool readDelim(const char* const, std::vector< std::vector<double> >&, bool vervose = false);
+	bool readDelim(const char* const, std::vector< std::vector<double> >&);
 }
 
 

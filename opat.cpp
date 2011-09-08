@@ -32,6 +32,32 @@ void OPAT::initialize(const std::vector< std::vector<double> > &data)
 	mElRegions.clear();
 }
 
+void OPAT::initialize(const std::vector< std::vector<double> > &data, const std::vector<size_t> &varIndex)
+{
+	for(size_t index = 0; index < mDimension; index++) {
+		size_t dimNum = varIndex[index];
+		double minPos = data[0][dimNum];
+		double maxPos = minPos;
+		for(size_t dataNum = 1; dataNum < data.size(); dataNum++) {
+			minPos = (minPos > data[dataNum][dimNum]) ? data[dataNum][dimNum] : minPos;
+			maxPos = (maxPos < data[dataNum][dimNum]) ? data[dataNum][dimNum] : maxPos;
+		}
+
+		mOffset[index] = minPos - (maxPos - minPos) / M_PI;
+		mScale[index] = maxPos - minPos + 2.0 * (maxPos - minPos) / M_PI;
+	}
+
+	for(size_t dataNum = 0; dataNum < mData.size(); dataNum++) {
+		mData[dataNum].resize(mDimension);
+		for(size_t index = 0; index < mDimension; index++) {
+			size_t dimNum = varIndex[index];
+			mData[dataNum][index] = round(pow(2, MAX_SPLIT_DEPTH) * (data[dataNum][dimNum] - mOffset[index]) / mScale[index]);
+		}
+	}
+
+	mElRegions.clear();
+}
+
 void OPAT::build(size_t numLookAheads, double rho)
 {
 	OPATNode root(mDimension);
@@ -172,7 +198,7 @@ inline double OPAT::computeCoeff(size_t leftNum, size_t rightNum)
 	return(logVal);
 }
 
-void OPAT::writePostDensity(const std::string filename)
+void OPAT::writePostDensity(std::string filename)
 {
 	std::ofstream ofs;
 	ofs.open(filename.c_str(), std::ios_base::app);
@@ -202,24 +228,17 @@ void OPAT::writePostDensity(const std::string filename)
 	ofs.close();
 }
 
-inline double OPAT::computeML()
+double OPAT::computeConditionalML(size_t var)
 {
+	assert(var < mDimension);
+
 	double ml = 0.0;
 	for(size_t regionNum = 0; regionNum < mElRegions.size(); regionNum++) {
 		double depth = 0.0;
 		for(size_t dimNum = 0; dimNum < mDimension; dimNum++)
 			depth += mElRegions[regionNum].mDepths[dimNum];
 		ml += mElRegions[regionNum].mPoints.size() * (log(mElRegions[regionNum].mProbMass) + depth * log(2));
-		for(size_t dimNum = 0; dimNum < mDimension; dimNum++)
-			ml -= mElRegions[regionNum].mPoints.size() * log(mScale[dimNum]);
 	}
-
-	return(ml);
-}
-
-double OPAT::computeConditionalML(size_t var)
-{
-	assert(var < mDimension);
 
 	double marginalML = 0.0;
 	for(size_t dataNum = 0; dataNum < mData.size(); dataNum++) {
@@ -237,10 +256,9 @@ double OPAT::computeConditionalML(size_t var)
 
 			if(covered) {
 				marginals.push_back(log(region.mProbMass));
-				for(size_t dimNum = 0; dimNum < mDimension; dimNum++) {
+				for(size_t dimNum = 0; dimNum < mDimension; dimNum++)
 					if(dimNum != var)
-						marginals.back() += log(2) * region.mDepths[dimNum] - log(mScale[dimNum]);
-				}
+						marginals.back() += log(2) * region.mDepths[dimNum];
 			}
 		}
 
@@ -252,30 +270,10 @@ double OPAT::computeConditionalML(size_t var)
 		marginalML += marginalSum;
 	}
 
-	return(computeML() - marginalML);
-}
-
-double OPAT::computeMI()
-{
-	assert(mDimension == 2);
-	double MI = (computeConditionalML(0) + computeConditionalML(1) - computeML()) / (double) mData.size();
-	return(MI);
-}
-
-double OPAT::computeEntropy()
-{
-	assert(mDimension == 1);
-
-	double entropy = 0.0;
-	for(size_t regionNum = 0; regionNum < mElRegions.size(); regionNum++)
-		entropy -= mElRegions[regionNum].mPoints.size() * log(mElRegions[regionNum].mProbMass);
-
-	return(entropy / (double) mData.size());
+	return(ml - marginalML - mData.size() * log(mScale[var]));
 }
 
 void OPAT::debug()
 {
-	for(size_t dimNum = 0; dimNum < mDimension; dimNum++)
-		std::cout << computeConditionalML(dimNum) << "\t";
-	std::cout << std::endl;
+
 }

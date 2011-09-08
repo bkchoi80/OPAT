@@ -32,12 +32,10 @@ class OPAT
 {
 public:
 	OPAT(const std::vector< std::vector<double> > &data) : mDimension(data[0].size()), mOffset(mDimension), mScale(mDimension), mData(data.size()) { initialize(data); };
+	OPAT(const std::vector< std::vector<double> > &data, const std::vector<size_t> &varIndex) : mDimension(varIndex.size()), mOffset(mDimension), mScale(mDimension), mData(data.size()) { initialize(data, varIndex); };
 	void build(size_t, double);
-	void writePostDensity(const std::string filename);
+	void writePostDensity(std::string filename);
 	double computeConditionalML(size_t var);
-	inline double computeML();
-	double computeMI();
-	double computeEntropy();
 	void debug();
 
 private:
@@ -48,6 +46,7 @@ private:
 	std::vector<OPATNode> mElRegions;
 
 	void initialize(const std::vector< std::vector<double> > &data);
+	void initialize(const std::vector< std::vector<double> > &data, const std::vector<size_t> &varIndex);
 	inline double computeCoeff(size_t leftNum, size_t rightNum);
 	void buildSub(OPATNode &node, size_t numLookAheads, double rho);
 	void buildLookAhead(OPATNode &node, size_t numLookAheads, double rho);
